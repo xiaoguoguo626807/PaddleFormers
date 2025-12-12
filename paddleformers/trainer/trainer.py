@@ -3109,7 +3109,7 @@ class Trainer:
                 assert self.optimizer is not None, "optimizer is empty!"
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
 
-        if HAS_PADDLEFLEET and isinstance(model, PaddleFleetParallelBase):
+        if HAS_PADDLEFLEET and isinstance(model, PaddleFleetPipelineLayer):
             in_pipeline_parallel_mode = True
         else:
             in_pipeline_parallel_mode = self.args.pipeline_model_parallel_size > 1
@@ -3152,7 +3152,10 @@ class Trainer:
             )
             if isinstance(model, LoRAModel):
                 model = model.model
-            model = fleet.distributed_model(model)
+            if HAS_PADDLEFLEET and isinstance(model, PaddleFleetPipelineLayer):
+                model = paddlefleet_dist_model.distributed_model(model)
+            else:
+                model = fleet.distributed_model(model)
             if prepare_pipeline_inputs_func is not None:
                 model._prepare_pipeline_inputs_func = prepare_pipeline_inputs_func
             else:
@@ -3175,6 +3178,14 @@ class Trainer:
 
                     keys = list(inputs[0].keys())
                     inputs_batch = {key: [data.pop(key) for data in inputs] for key in keys}
+                    if HAS_PADDLEFLEET and isinstance(model, PaddleFleetParallelBase):
+                        first_stage_inputs_batch = inputs_batch
+                        last_stage_inputs = first_stage_inputs_batch.pop("labels")
+                        outputs = (
+                            first_stage_inputs_batch,
+                            last_stage_inputs,
+                        )
+                        return outputs
                     return [
                         get_expected_keys(inputs_batch, first_stage_keys),
                         get_expected_keys(inputs_batch, last_stage_keys),
