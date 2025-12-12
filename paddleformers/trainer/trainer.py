@@ -3018,48 +3018,6 @@ class Trainer:
                     param.initialize()
 
             return model
-        if HAS_PADDLEFLEET and isinstance(model, LoRAModel):
-            model = model.model
-        if HAS_PADDLEFLEET and isinstance(model, PaddleFleetPipelineLayer):
-            prepare_pipeline_inputs_func = (
-                model._prepare_pipeline_inputs_func if hasattr(model, "_prepare_pipeline_inputs_func") else None
-            )
-            model = paddlefleet_dist_model.distributed_model(model)
-            if prepare_pipeline_inputs_func is not None:
-                model._prepare_pipeline_inputs_func = prepare_pipeline_inputs_func
-            else:
-
-                def _prepare_pipeline_inputs_func(inputs):
-                    first_stage_keys = ["input_ids", "attention_mask", "position_ids"]
-                    last_stage_keys = ["labels"]
-
-                    def get_expected_keys(inputs, keys):
-                        ret = tuple([inputs.pop(k) for k in keys if k in inputs])
-                        if len(ret) == 1:
-                            ret = ret[0]
-                        return ret
-
-                    if type(inputs) is dict or type(inputs) is OrderedDict:
-                        return [
-                            get_expected_keys(inputs, first_stage_keys),
-                            get_expected_keys(inputs, last_stage_keys),
-                        ]
-
-                    keys = list(inputs[0].keys())
-                    inputs_batch = {key: [data.pop(key) for data in inputs] for key in keys}
-                    first_stage_inputs_batch = inputs_batch
-                    last_stage_inputs = first_stage_inputs_batch.pop("labels")
-                    outputs = (
-                        first_stage_inputs_batch,
-                        last_stage_inputs,
-                    )
-                    return outputs
-
-                logger.warning(
-                    "Using default prepare pipeline inputs func, only support input_ids and labels as inputs."
-                )
-                model._prepare_pipeline_inputs_func = _prepare_pipeline_inputs_func
-            return model
 
         # train/eval could be run multiple-times - if already wrapped, don't re-wrap it again
         if unwrap_model(model) is not model:

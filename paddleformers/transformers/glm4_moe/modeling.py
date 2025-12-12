@@ -1523,7 +1523,7 @@ class Glm4MoeModel(Glm4MoePreTrainedModel):
         )
 
 
-class Glm4MoeForCausalLM(Glm4MoePreTrainedModel):
+class Glm4MoeForCausalLMFleet(Glm4MoePreTrainedModel):
     is_fleet = True
 
     def __new__(cls, config):
@@ -1537,7 +1537,7 @@ class Glm4MoeForCausalLM(Glm4MoePreTrainedModel):
         return gpt_model
 
 
-class Glm4MoeForCausalLMFleet(Glm4MoePreTrainedModel):
+class Glm4MoeForCausalLM(Glm4MoePreTrainedModel):
     _tied_weights_keys = ["lm_head.weight"]
     _tp_plan = {"lm_head": "colwise_rep"}
     _pp_plan = {"lm_head": (["hidden_states"], ["logits"])}
@@ -1682,18 +1682,8 @@ class Glm4MoeDecoderLayerPipe(Glm4MoeDecoderLayer):
         return ret
 
 
-class Glm4MoeForCausalLMPipeFleet(GeneralModelForCausalLMPipe):
-    is_fleet = True
-
-    def __new__(cls, config):
-        model_provider_class = GLMMoEModelProvider
-        model_provider = model_provider_class.from_config(config)
-        gpt_model = model_provider.provide()
-        gpt_model._gen_aoa_config = cls._gen_aoa_config
-        gpt_model._gen_inv_aoa_config = cls._gen_inv_aoa_config
-        gpt_model._get_tensor_parallel_mappings = cls._get_tensor_parallel_mappings
-        gpt_model.config_to_save = config
-        return gpt_model
+class Glm4MoeForCausalLMPipeFleet(GeneralModelForCausalLMPipe, Glm4MoeForCausalLM):
+    pass
 
 
 class Glm4MoeForCausalLMPipe(GeneralModelForCausalLMPipe):
